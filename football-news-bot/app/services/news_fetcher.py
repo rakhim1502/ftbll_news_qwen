@@ -37,21 +37,32 @@ class NewsItem:
     source_name: str
 
 
-def _strip_html(text: str) -> str:
-    """HTML teglarini va ortiqcha bo'sh joylarni tozalaydi.
+_ENTITY_RE = re.compile(r"&(?:(#[0-9]+|#x[0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]*);?)")
 
-    Matn XML parse'idan keyin allaqachon entity'lardan butunlangan bo'ladi.
-    Ba'zi manbalar (masalan, The Guardian) qo'shimcha CDATA/HTML bloklari
-    ichida ikki tomonlama escape qilgan holatda (&amp;lt; kabi) qaytaradi —
-    shu sababli elementar entity ko'rinishlarini yana bir marta ochamiz.
-    Keyinchalik formatter barcha matnni Telegram uchun qayta escape qiladi.
+
+def _strip_html(text: str) -> str:
+    """HTML teglarini va barcha entity kodlarini sof matnga aylantiradi.
+
+    Matn XML parse'idan keyin allaqachon bitta entity qatlamdan ochilgan
+    bo'ladi. Lekin ba'zi manbalar (The Guardian CDATA, Sky Sports HTML
+    tavsifi) qo'shimcha escape qatlamini saqlaydi (&amp;#x27; kabi).
+    Shu sababli entity ochishni *takror-takror* bajaramiz — to yakuniy
+        qatorda hech qanday "&..." ko'rinishidagi kod qolmaguncha.
+    Natijada NewsItem matnlari 100% sof (plain) matn bo'ladi; formatter
+    buni Telegram uchun bir marta escape qiladi.
     """
     text = re.sub(r"<[^>]+>", " ", text or "")
-    if re.search(r"&(amp|lt|gt|quot|#x?\d+;?);", text):
-        # Manba CDATA/HTML ichida qo'shimcha escape qilgan (masalan, The Guardian)
-        text = html.unescape(text)
-    # Ba'zi manbalar (Sky Sports) ISO-8859-1 entity ko'rinishlarini yuboradi:
-    text = text.replace("&#x27;", "'").replace("&#39;", "'").replace("&#x2B;", "+")
+    # Cheklangan iteratsiyalar bilan to'liq unescape (xavfsizlik uchun max 5):
+    for _ in range(5):
+        if not _ENTITY_RE.search(text):
+            break
+        unescaped = html.unescape(text)
+        if unescaped == text:
+            break
+        text = unescaped
+    # Baribir qolib ketgan noto'g'ri entity'larni (masalan, "&#x" uzilgan)
+    # xavfsiz o'chiramiz:
+    text = re.sub(r"&(#x?[0-9A-Fa-f]*;?|amp;?|lt;?|gt;?|quot;?|apos;?|nbsp;?)", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
