@@ -47,11 +47,16 @@ _UZ_TERMS: dict[str, str] = {
 
 
 def _light_uz(text: str) -> str:
-    """Matndagi aytilgan iboralarni o'zbekchalashtiradi (so'zma-so'z, fakt saqlanadi)."""
-    out = text
+    """Matndagi aytilgan iboralarni o'zbekchalashtiradi (so'zma-so'z, fakt saqlanadi).
+
+    Eslatma: avval `&` belgisini himoya qilamiz (&amp;, &quot; kabi entity
+    qoldiqlari ichidagi so'zlarni tarjima qilib buzmang).
+    """
+    protected = text.replace("&", "\x00")
+    out = protected
     for en, uz in _UZ_TERMS.items():
         out = re.sub(rf"\b{re.escape(en)}\b", uz, out, flags=re.IGNORECASE)
-    return out
+    return out.replace("\x00", "&")
 
 
 def _truncate(text: str, limit: int = 260) -> str:
@@ -194,6 +199,28 @@ async def _ai_summarize(item: NewsItem) -> str | None:
         return None
 
 
+async def _strip_leaked_entities(text: str) -> str:
+    """Matnda qolgan HTML entity kodlarini (&quot;, &apos; va h.k.) sof belgilarga ochadi.
+
+    Ba'zi manbalar (masalan, Sky Sports tavsifi) CDATA ichida ikki qatlamli
+    escape ishlatadi — parse'dan keyin ham `&quot;` ko'rinishidagi qoldiqlar
+    qolishi mumkin. Bu funksiya yakuniy chiqishdan oldin ularni ochadi.
+    """
+    if "&" not in text:
+        return text
+    import html as _html
+
+    prev = None
+    out = text
+    # Bir necha qatlam bo'lsa ham — to qoldiq qolmaguncha ochamiz
+    while prev != out and "&" in out:
+        prev = out
+        out = _html.unescape(out)
+    # Ochib bo'lmaydigan yaroqsiz kodlarni (&#x zarranglari) olib tashlaymiz
+    out = re.sub(r"&(?:#x[0-9A-Fa-f]*|#\d*|[A-Za-z0-9]*);?", "", out)
+    return out
+
+
 async def summarize_item(item: NewsItem) -> str:
     """Bitta xabar uchun o'zbekcha qisqa mazmun qaytaradi.
 
@@ -202,6 +229,7 @@ async def summarize_item(item: NewsItem) -> str:
     if ai_enabled():
         ai_text = await _ai_summarize(item)
         if ai_text:
+            ai_text = await _strip_leaked_entities(ai_text)
             return ai_text if ai_text.endswith((".", "!", "?")) else ai_text + "."
     # --- Fallback (AI'siz) ---
     parts: list[str] = []
@@ -214,7 +242,8 @@ async def summarize_item(item: NewsItem) -> str:
     if title and not any(_normalize(title) in _normalize(p) for p in parts):
         parts.insert(0, title)
     text = ". ".join(p.rstrip(".") for p in parts if p)
-    return (text + ".") if text and not text.endswith(".") else text
+    text = (text + ".") if text and not text.endswith(".") else text
+    return await _strip_leaked_entities(text)
 
 
 def _normalize(s: str) -> str:

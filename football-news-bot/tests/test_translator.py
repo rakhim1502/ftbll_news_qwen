@@ -43,3 +43,27 @@ async def test_no_duplicate_title_in_summary():
     same = "Mbappe signs for Real Madrid"
     s = await summarize_item(make(same, same))
     assert s.lower().count("mbappe") == 1
+
+
+async def test_leaked_entities_are_resolved(monkeypatch):
+    """Sky Sports kabi manbalardan qolgan &quot;/&apos; qoldiqlari ochiladi."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("QWEN_API_KEY", raising=False)
+    item = make(
+        "What is wrong with Bruno Fernandes?",
+        'A day before Manchester United&apos;s trip the club issued a statement '
+        'on an &quot;jarohat niggle&quot; but stressed there was nothing to worry about.',
+    )
+    s = await summarize_item(item)
+    assert "&quot;" not in s and "&apos;" not in s and "&#x" not in s
+    # Faktlar saqlanadi, matnda oddiy tiriq belgilari bo'ladi
+    assert "'" in s or '"' in s
+
+
+def test_light_uz_does_not_break_entities():
+    """&amp; ichidagi 'amp' so'zini tarjima qilib 'g'alaba'ga aylantirmasin."""
+    from app.services.translator import _light_uz
+
+    assert _light_uz("News &amp; views: team wins") == "News &amp; views: team g'alaba"
+    # oddiy holatda ham entity buzilmaydi
+    assert _light_uz("A &amp; B") == "A &amp; B"
