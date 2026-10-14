@@ -52,8 +52,11 @@ def is_football(item: NewsItem) -> bool:
     if any(h in url for h in NON_FOOTER_HINTS):
         return False
 
-    # 2) URL'dagi /football/ yoki /soccer/ yo'li — eng ishonchli belgi
-    if re.search(r"/(football|soccer)/", url):
+    # 2) URL'dagi /football/ yoki /soccer/ yo'li — eng ishonchli belgi.
+    #    Oddiy "/sport/" yo'li ham qabul qilinadi (masalan, BBC
+    #    https://www.bbc.co.uk/sport/football-xyz kabi sahifa ID'lari),
+    #    chunki 1-qadamda boshqa sport turlari allaqachon rad etilgan.
+    if re.search(r"/(football|soccer)/", url) or "/sport" in url:
         return True
 
     # 3) Sarlavhadagi aniq futbol atamalari
