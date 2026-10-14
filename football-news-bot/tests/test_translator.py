@@ -61,9 +61,32 @@ async def test_leaked_entities_are_resolved(monkeypatch):
 
 
 def test_light_uz_does_not_break_entities():
-    """&amp; ichidagi 'amp' so'zini tarjima qilib 'g'alaba'ga aylantirmasin."""
+    """&amp; ichidagi 'amp' so'zini tarjima qilib buzmasin."""
     from app.services.translator import _light_uz
 
-    assert _light_uz("News &amp; views: team wins") == "News &amp; views: team g'alaba"
+    # "wins" so'zi lug'atda yo'q (faqat "win" bor) — shu sabab o'zgarmaydi;
+    # eng muhimi: &amp; ichidagi "amp" -> "g'alaba" bo'lib ketmaydi
+    assert _light_uz("News &amp; views: team wins") == "News &amp; views: team wins"
     # oddiy holatda ham entity buzilmaydi
     assert _light_uz("A &amp; B") == "A &amp; B"
+    # to'liq so'z mosligida esa tarjima ishlaydi va entity tinch qoladi
+    assert _light_uz("Team win at Old Trafford &amp; Anfield") == \
+        "Team g'alaba at Old Trafford &amp; Anfield"
+    # &#39; ichidagi raqam/harf iboralarga mos kelib, entity'ni yaroqsiz
+    # holga ("g&apos;alaba") keltirmasin
+    assert _light_uz("Play-off &#39;alaba final") == "Play-off &#39;alaba final"
+
+
+async def test_summarize_item_unescapes_leaked_entities_before_glossary():
+    """Sky/BBC feed'laridan qolgan &#39;/&quot; qatlam tarjimadan OLDIN ochilsin.
+
+    Eski bug: "&#39;alaba" ichidagi bo'lak "win" lug'ati bilan almashtirilib,
+    keyin ochilganda "g&apos;alaba" kabi yaroqsiz qoldiq chiqardi.
+    """
+    item = make(
+        "Why play-off win may not send Wales to World Cup",
+        "Wales face Norway in the Women&#39;s World Cup play-off final.",
+    )
+    s = await summarize_item(item)
+    assert "g&apos;alaba" not in s and "&#x" not in s and "&#39;" not in s
+    assert "g'alaba" in s  # to'g'ri tarjima ochiq apostrof bilan

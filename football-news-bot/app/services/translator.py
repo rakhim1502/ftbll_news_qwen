@@ -49,14 +49,40 @@ _UZ_TERMS: dict[str, str] = {
 def _light_uz(text: str) -> str:
     """Matndagi aytilgan iboralarni o'zbekchalashtiradi (so'zma-so'z, fakt saqlanadi).
 
-    Eslatma: avval `&` belgisini himoya qilamiz (&amp;, &quot; kabi entity
-    qoldiqlari ichidagi so'zlarni tarjima qilib buzmang).
+    Normal yo'l: news_fetcher._strip_html() barcha entity'larni sof matnga
+    ochib bo'lgan — kiruvchi matnda `&amp;` kabi kodlar bo'lmaydi.
+    Himoya qatori: shunga qaramay kirgan `&...;` entity kodlari
+    (&#39;, &quot;, &amp;) lug'at almashtirishidan chetda ushlab turiladi —
+    chunki ularni buzish pastki qatlamdagi haqiqiy so'zni yashiradi
+    (masalan `&#39;alaba` ichida "win"-ga o'xshash bo'lak paydo bo'ladi).
+    Chiqishda esa entity'lar yana ochiladi — yakuniy xabarda yaroqsiz
+    qoldiq (`&#x`, `g&apos;alaba`) qolmasligi uchun `_strip_leaked_entities`
+    ishlaydi.
     """
-    protected = text.replace("&", "\x00")
+    # 1) Entity kodlarini butunlay ajratib olamiz (ichidagi har qanday belgi
+    #    lug'atga tuşib qolmasin): & harfi \x00, qolgan qismi \x01 bilan
+    entities: list[str] = []
+
+    def _protect(m: re.Match) -> str:
+        entities.append(m.group(0))
+        return "\x00" + "\x01" * len(m.group(0))
+
+    protected = re.sub(r"&[#A-Za-z0-9]+;", _protect, text)
     out = protected
     for en, uz in _UZ_TERMS.items():
         out = re.sub(rf"\b{re.escape(en)}\b", uz, out, flags=re.IGNORECASE)
-    return out.replace("\x00", "&")
+    # 2) Himoyalangan joylarni tiklash (uzunlik o'zgargan bo'lishi mumkin —
+    #    shu sabab \x00 belgisidan keyin ketma-ket kelgan \x01 larni o'chiramiz)
+    idx = 0
+
+    def _restore(_m: re.Match) -> str:
+        nonlocal idx
+        repl = entities[idx]
+        idx += 1
+        return repl
+
+    out = re.sub(r"\x00\x01+", _restore, out)
+    return out.replace("\x00", "&")  # yaroqsiz (semikolsiz) "&..." qoldiqlari
 
 
 def _truncate(text: str, limit: int = 260) -> str:
@@ -232,11 +258,20 @@ async def summarize_item(item: NewsItem) -> str:
             ai_text = await _strip_leaked_entities(ai_text)
             return ai_text if ai_text.endswith((".", "!", "?")) else ai_text + "."
     # --- Fallback (AI'siz) ---
+    # Qo'shimcha himoya qatori: feed'dan kutilmagan entity qatlam kelsa,
+    # uni sof matnga ochamiz. `unescape` ni hech qanday almashtirishdan
+    # OLDIN bajaramiz — shunda "&#39;alaba" ichidagi bo'lak "win" lug'ati
+    # bilan buzilib, keyinchalik ochilganda "g&apos;alaba" kabi yaroqsiz
+    # qoldiq paydo bo'lmaydi.
+    import html as _html
+
+    item_title = _html.unescape(item.title or "")
+    item_summary = _html.unescape(item.summary) if item.summary else ""
     parts: list[str] = []
-    title = _light_uz(item.title)
-    if item.summary and _normalize(item.summary) != _normalize(item.title):
-        meaningful = _first_sentences(item.summary)
-        if meaningful and _normalize(meaningful) != _normalize(item.title):
+    title = _light_uz(item_title)
+    if item_summary and _normalize(item_summary) != _normalize(item_title):
+        meaningful = _first_sentences(item_summary)
+        if meaningful and _normalize(meaningful) != _normalize(item_title):
             parts.append(_light_uz(_truncate(meaningful)))
     # Sarlavha tavsifda qoplangan bo'lsa uni takrorlamaymiz, aks holda boshiga qo'yamiz
     if title and not any(_normalize(title) in _normalize(p) for p in parts):
