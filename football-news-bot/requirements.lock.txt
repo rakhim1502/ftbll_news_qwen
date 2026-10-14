@@ -1,0 +1,9 @@
+# Aniq (pinned) versiyalar — Windows/Linux, Python 3.12 bilan tekshirilgan.
+# Takrorlanadigan o'rnatish: pip install -r requirements.lock.txt
+aiogram==3.31.0
+httpx==0.28.1
+python-dotenv==1.1.1
+
+# Testlar uchun (dev)
+pytest==9.1.1
+pytest-asyncio==1.4.0
