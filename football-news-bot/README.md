@@ -11,7 +11,7 @@ maqola havolasini qo'shadi.
 |---|---|---|
 | 1 — MVP | ✅ Tayyor | `/start`, RSS yig'ish (parallel + timeout), dedupe+saralash, oddiy qisqartirish, HTML format, xatoga chidamli |
 | 2 — AI qisqartirish | ✅ Tayyor | `translator.py`da Gemini/Qwen chaqiruvi (fallback bilan); kalit bo'lmasa avtomatik AI'siz rejim |
-| 3 — Testlar | ✅ Tayyor | `tests/` — 20 ta pytest testi (fetcher, ranker, translator, formatter) |
+| 3 — Testlar | ✅ Tayyor | `tests/` — 30 ta pytest testi (fetcher, ranker, translator, formatter + `/start` pipeline smoke testlari) |
 
 ## Tekshirilgan RSS manbalar (2026-10-14)
 
