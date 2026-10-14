@@ -71,6 +71,37 @@ football-news-bot/
 
 To'xtatish: terminalda `Ctrl+C`.
 
+## AI qisqartirishni yoqish (ixtiyoriy)
+
+Bot kalitsiz ham ishlaydi (sarlavha+taqriz asosidagi naqshli qisqartirish).
+Tabiiyroq o'zbekcha matn uchun `.env`ga bitta kalit qo'ying:
+
+**Gemini (tavsiya etiladi):**
+1. https://aistudio.google.com/apikey ga kiring → *Create API key* → kalitni oling.
+2. `.env`:
+   ```
+   GEMINI_API_KEY=AQ.Ab8...sizning_kalitingiz
+   GEMINI_MODEL=gemini-2.0-flash   # kerak bo'lsa boshqa mavjud model nomiga almashtiring
+   ```
+
+**Qwen (Alibaba DashScope):**
+1. https://dashscope.console.aliyun.com da ro'yxatdan oting → *API-KEY* yarating.
+2. `.env`:
+   ```
+   QWEN_API_KEY=sk-...sizning_kalitingiz
+   QWEN_MODEL=qwen-plus
+   ```
+
+Ikkala kalit bo'lsa, birinchisi (Gemini) ishlatiladi. AI so'rovi xato bersa yoki
+javob yaroqsiz bo'lsa, bot avtomatik ravishda AI'siz rejimga qaytadi — foydalanuvchi
+bilmaydi ham. Modelga **faqat** RSS'dan olingan sarlavha/taqriz beriladi va sistem
+prompt faktlarni to'qiqlashni qat'iyan taqiqlaydi.
+
+Sinab ko'rish (butun zanjir, Telegram'siz):
+```powershell
+python scripts/demo_run.py
+```
+
 ## Xavfsizlik
 
 - Token va API kalitlari faqat `.env` orqali (kod ichida yo'q).

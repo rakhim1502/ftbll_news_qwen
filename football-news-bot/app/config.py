@@ -49,9 +49,11 @@ HTTP_USER_AGENT = (
 @dataclass
 class Settings:
     bot_token: str = ""
-    # Keyingi bosqichlar uchun (AI qisqartirish) — hozircha bo'sh qolsa ham ishlaydi:
+    # AI qisqartirish uchun (kalitlar bo'lmasa avtomatik AI'siz rejim ishlaydi):
     gemini_api_key: str = ""
     qwen_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"   # GEMINI_MODEL bilan almashtiriladi
+    qwen_model: str = "qwen-plus"            # QWEN_MODEL bilan almashtiriladi
     news_max_age_hours: int = 36   # "bugungi" deb hisoblash oynasi
     sources: tuple[RssSource, ...] = field(default_factory=lambda: RSS_SOURCES)
 
@@ -61,6 +63,8 @@ class Settings:
             bot_token=os.getenv("BOT_TOKEN", "").strip(),
             gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
             qwen_api_key=os.getenv("QWEN_API_KEY", "").strip(),
+            gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip(),
+            qwen_model=os.getenv("QWEN_MODEL", "qwen-plus").strip(),
             news_max_age_hours=int(os.getenv("NEWS_MAX_AGE_HOURS", "36")),
         )
 

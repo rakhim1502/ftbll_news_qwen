@@ -27,6 +27,52 @@ KEYWORDS: dict[str, int] = {
     "bayern": 1, "juventus": 1, "inter": 1, "psg": 1,
 }
 
+# Futbolga oid BO'LMAGAN sport turlari. Ba'zi manbalar (masalan, Sky Sports
+# 12040 feed) umumiy sport yangiliklarini beradi — rugby, NFL, tennis, golf,
+# F1, velosiped va ot poygasi xabarlari futbol botiga kirmasligi kerak.
+NON_FOOTER_HINTS: tuple[str, ...] = (
+    "/rugby", "/nfl", "/tennis", "/golf", "/f1/", "/motor-sport",
+    "/cycling", "/racing", "/boxing", "/darts", "/snooker",
+    "/cricket", "/athletics", "/swimming",
+)
+
+
+def is_football(item: NewsItem) -> bool:
+    """Xabar futbolga tegishli ekanini URL/sarlavha bo'yicha tekshiradi.
+
+    Qoida: avval ANIQ futbol belgisini izlaymiz (URL'dagi /football/ yo'li
+    yoki sarlavhadagi futbol atamalari). "world cup", "final", "injury" kabi
+    umumiy so'zlar rugby/NFL/tennis'da ham uchraydi — ularni asosiy belgi
+    sifatida ISHLATMAYMIZ.
+    """
+    url = item.url.lower()
+    title = item.title.lower()
+
+    # 1) URL aniq boshqa sport turiga tegishli -> darhol rad etamiz
+    if any(h in url for h in NON_FOOTER_HINTS):
+        return False
+
+    # 2) URL'dagi /football/ yoki /soccer/ yo'li — eng ishonchli belgi
+    if re.search(r"/(football|soccer)/", url):
+        return True
+
+    # 3) Sarlavhadagi aniq futbol atamalari
+    football_terms = (
+        "football", "soccer", "futbol",
+        "premier league", "champions league", "europa league", "conference league",
+        "la liga", "bundesliga", "ligue 1", "eredivisie", "fa cup", "carabao",
+        "nations league", "world cup qualifier", "wc qualifier",
+        "fc ", "afc ", "cf ", "u21", "u-21", "women's super league",
+        "goalkeeper", "striker", "midfielder", "winger", "clean sheet",
+        "hat-trick", "red card", "match report", "team news", "line-up",
+        "real madrid", "barcelona", "bayern", "juventus", "inter milan",
+        "liverpool", "arsenal", "chelsea", "tottenham", "manchester united",
+        "manchester city", "newcastle", "aston villa", "dortmund", "psg",
+        "paris saint", "atletico", "napoli", "ac milan", "as roma",
+        "celtic", "rangers", "ajax", "benfica", "porto",
+    )
+    return any(t in title for t in football_terms)
+
 
 def _normalize_title(title: str) -> str:
     """Taqqoslash uchun sarlavhani soddalashtiradi (lower, punktuatsiyasiz)."""
@@ -76,8 +122,12 @@ def score_item(item: NewsItem, now: datetime | None = None) -> float:
 
 
 def rank_news(items: list[NewsItem], min_items: int = 5, max_items: int = 10) -> list[NewsItem]:
-    """Dedupe + saralash. Eng muhim `max_items` tagacha; kam bo'lsa shuncha qaytadi."""
-    unique = deduplicate(items)
+    """Filtr (faqat futbol) + dedupe + saralash.
+
+    Eng muhim `max_items` tagacha; kam bo'lsa shuncha qaytadi (sun'iy to'ldirmaydi).
+    """
+    football = [it for it in items if is_football(it)]
+    unique = deduplicate(football)
     ranked = sorted(unique, key=score_item, reverse=True)
     result = ranked[:max_items]
 

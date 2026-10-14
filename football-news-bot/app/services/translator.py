@@ -124,10 +124,14 @@ def ai_enabled() -> bool:
 
 
 async def _call_gemini(client: httpx.AsyncClient, item: NewsItem) -> str:
-    """Google Gemini REST API (generativelanguage v1beta)."""
+    """Google Gemini REST API (generativelanguage v1beta).
+
+    Model nomi GEMINI_MODEL env o'zgaruvchisi bilan sozlanadi — Google
+    eski modellarni deprecate qilganda kodni o'zgartirish talab qilinmaydi.
+    """
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-1.5-flash:generateContent"
+        f"{settings.gemini_model}:generateContent"
     )
     payload = {
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
@@ -146,10 +150,13 @@ async def _call_gemini(client: httpx.AsyncClient, item: NewsItem) -> str:
 
 
 async def _call_qwen(client: httpx.AsyncClient, item: NewsItem) -> str:
-    """Qwen — DashScope OpenGang-compatible chat/completions endpoint."""
+    """Qwen — DashScope OpenAI-compatible chat/completions endpoint.
+
+    Model nomi QWEN_MODEL env o'zgaruvchisi bilan sozlanadi.
+    """
     url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     payload = {
-        "model": "qwen-plus",
+        "model": settings.qwen_model,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": _build_user_prompt(item)},

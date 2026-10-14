@@ -52,7 +52,10 @@ def _strip_html(text: str) -> str:
     buni Telegram uchun bir marta escape qiladi.
     """
     text = re.sub(r"<[^>]+>", " ", text or "")
-    # Cheklangan iteratsiyalar bilan to'liq unescape (xavfsizlik uchun max 5):
+    # Cheklangan iteratsiyalar bilan to'liq unescape (xavfsizlik uchun max 5).
+    # Diqqat: bu bosqichda "&amp;".", "&" kabi oddiy "&" larni O'CHIRMAYMIZ —
+    # ular ba'zan haqiqiy matn qismi ("R&B", "Q&A"). Yakuniy toza "&" larni
+    # formatter.py Telegram uchun bir marta &amp; qilib escape qiladi.
     for _ in range(5):
         if not _ENTITY_RE.search(text):
             break
@@ -60,9 +63,12 @@ def _strip_html(text: str) -> str:
         if unescaped == text:
             break
         text = unescaped
-    # Baribir qolib ketgan noto'g'ri entity'larni (masalan, "&#x" uzilgan)
-    # xavfsiz o'chiramiz:
-    text = re.sub(r"&(#x?[0-9A-Fa-f]*;?|amp;?|lt;?|gt;?|quot;?|apos;?|nbsp;?)", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    # Oxirgi himoya qatori: YAROQSIZ entity qoldiqlarini o'chiramiz — masalan
+    # uzilgan "&#x" yoki semikolsiz "&amp"/"&quot"/"&apos" (ba'zi manbalar
+    # yarim escape qilingan matn beradi). To'liq "&amp;" / "&#8217;" kabi
+    # yaroqli entitylar yuqorida allaqachon ochilgan bo'ladi.
+    text = re.sub(r"&(?:#x?[0-9A-Fa-f]*|amp|lt|gt|quot|apos|nbsp)(?!;)", " ", text, flags=re.IGNORECASE)
     return re.sub(r"\s+", " ", text).strip()
 
 
