@@ -1,19 +1,30 @@
 """Yangiliklarni o'zbek tiliga tarjima qilish / qisqartirish.
 
-MVP (1-bosqich): AI kaliti bo'lmasa ham bot ishlashi uchun oddiy
-lug'at asosidagi "pseudotarjima" + sarlavha/tavsifni birlashtirish.
-Bu faktlarni o'zgartirmaydi — faqat tushunarli ko'rinishga keltiradi.
+AI rejimi (GEMINI_API_KEY yoki QWEN_API_KEY .env'da to'ldirilgan bo'lsa):
+- Modelga FAQAT olingan maqola ma'lumotlari (sarlavha + RSS tavsifi) beriladi.
+- Sistem prompt faktlarni to'qiymaslikni qat'iy taqiqlaydi.
+- Javob tekshiriladi; xato/bo'sh bo'lsa avtomatik fallback ishlaydi.
 
-2-bosqichda shu interfeys orqali Gemini yoki Qwen API ulanadi
-(sistem prompt: "faqat berilgan matnga tayangan holda 2-3 jumlada
-o'zbekcha qisqartir, hech narsani to'qiyma").
+Fallback rejimi (AI kalitlari bo'lmasa — standart holat):
+- Sarlavha + RSS tavsifidagi eng mazmunli jumlalarni tanlab, kichik
+  lug'at bilan o'zbekchalashtiradi. Faktlarni o'zgartirmaydi.
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
 import re
 
+import httpx
+
+from app.config import settings
 from app.services.news_fetcher import NewsItem
+
+logger = logging.getLogger(__name__)
+
+AI_TIMEOUT_SEC = 20.0
 
 # Kichik ko'p uchraydigan sport so'zlari lug'ati (faktlarni o'zgartirmaydi)
 _UZ_TERMS: dict[str, str] = {
@@ -83,13 +94,109 @@ def _first_sentences(text: str, max_sentences: int = 2, min_len: int = 40) -> st
     return ". ".join(good[:max_sentences])
 
 
+# ---------------------------------------------------------------------------
+# AI qisqartirish (Gemini / Qwen) — kalitlar .env orqali, kod ichida yo'q
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT = (
+    "Sen futbol yangiliklarini o'zbek tiliga tarjima qiluvchi yordamchisan. "
+    "Quyidagi MAQOLA SARLVHASI va TAQRIZIGA tayangan holda 2-3 ta qisqa, "
+    "tabiiy o'zbek jumlasida xulosa yoz. QAT'IY QOIDALAR: "
+    "1) Faqat berilgan matndagi faktlardan foydalan — hech qanday yangi "
+    "ma'lumot, sana, nom yoki tafsilot QO'SHMA (to'qiyma). "
+    "2) Futbolchi va klub nomlarini asl ko'rinishida saqlab qol. "
+    "3) Berilgan matnda yetarli ma'lumot bo'lmasa, faqat sarlavhani tabiiy "
+    "o'zbekcha qilib yoz. "
+    "4) Javobda FAQAT o'zbekcha matn bo'lsin — izoh, prefiks yoki markdown YO'Q."
+)
+
+
+def _build_user_prompt(item: NewsItem) -> str:
+    return (
+        f"MANBA: {item.source_name}\n"
+        f"MAQOLA SARLVHASI: {item.title}\n"
+        f"TAQRIZ: {(item.summary or '(yo\'q)')[:900]}"
+    )
+
+
+def ai_enabled() -> bool:
+    return bool(settings.gemini_api_key or settings.qwen_api_key)
+
+
+async def _call_gemini(client: httpx.AsyncClient, item: NewsItem) -> str:
+    """Google Gemini REST API (generativelanguage v1beta)."""
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "gemini-1.5-flash:generateContent"
+    )
+    payload = {
+        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": [{"parts": [{"text": _build_user_prompt(item)}]}],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 200},
+    }
+    resp = await client.post(
+        url,
+        params={"key": settings.gemini_api_key},
+        json=payload,
+        timeout=AI_TIMEOUT_SEC,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+
+async def _call_qwen(client: httpx.AsyncClient, item: NewsItem) -> str:
+    """Qwen — DashScope OpenGang-compatible chat/completions endpoint."""
+    url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+    payload = {
+        "model": "qwen-plus",
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": _build_user_prompt(item)},
+        ],
+        "temperature": 0.2,
+        "max_tokens": 200,
+    }
+    resp = await client.post(
+        url,
+        headers={"Authorization": f"Bearer {settings.qwen_api_key}"},
+        json=payload,
+        timeout=AI_TIMEOUT_SEC,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data["choices"][0]["message"]["content"].strip()
+
+
+async def _ai_summarize(item: NewsItem) -> str | None:
+    """Mavjud kalit bilan qisqartirish; har qanday xatoda None (fallback)."""
+    try:
+        async with httpx.AsyncClient() as client:
+            if settings.gemini_api_key:
+                text = await _call_gemini(client, item)
+            else:
+                text = await _call_qwen(client, item)
+        # Javobni tekshirish: bo'sh emas, juda uzun emas, HTML bo'laklari yo'q
+        text = re.sub(r"\s+", " ", text or "").strip()
+        if not text or len(text) > 600 or "<" in text:
+            logger.warning("AI javobi yaroqsiz (%s): %r", item.title[:40], text[:80])
+            return None
+        return text
+    except (httpx.HTTPError, KeyError, IndexError, json.JSONDecodeError, asyncio.TimeoutError) as exc:
+        logger.warning("AI xatosi (%s): %s", item.title[:40], exc)
+        return None
+
+
 async def summarize_item(item: NewsItem) -> str:
     """Bitta xabar uchun o'zbekcha qisqa mazmun qaytaradi.
 
-    MVP: sarlavha + RSS tavsifi asosida (AI'siz).
-    Keyingi bosqich: agar GEMINI_API_KEY/QWEN_API_KEY bo'lsa, shu funksiya
-    ichida API'ga murojaat qilinadi (fallback shu yerda qoladi).
+    AI kaliti bo'lsa -> Gemini/Qwen; aks holda yoki xatoda -> fallback (AI'siz).
     """
+    if ai_enabled():
+        ai_text = await _ai_summarize(item)
+        if ai_text:
+            return ai_text if ai_text.endswith((".", "!", "?")) else ai_text + "."
+    # --- Fallback (AI'siz) ---
     parts: list[str] = []
     title = _light_uz(item.title)
     if item.summary and _normalize(item.summary) != _normalize(item.title):
@@ -108,5 +215,18 @@ def _normalize(s: str) -> str:
 
 
 async def summarize_items(items: list[NewsItem]) -> list[tuple[NewsItem, str]]:
-    """Xabarlar ro'yxatini (item, uz_mazmun) juftliklariga aylantiradi."""
+    """Xabarlar ro'yxatini (item, uz_mazmun) juftliklariga aylantiradi.
+
+    AI yoqilgan bo'lsa, so'rovlar parallel bajariladi (har biriga limit),
+    tartib saqlanadi.
+    """
+    if ai_enabled() and items:
+        sem = asyncio.Semaphore(4)  # API rate-limit'dan himoya
+
+        async def _one(it: NewsItem) -> tuple[NewsItem, str]:
+            async with sem:
+                return it, await summarize_item(it)
+
+        return list(await asyncio.gather(*(_one(it) for it in items)))
+
     return [(it, await summarize_item(it)) for it in items]
