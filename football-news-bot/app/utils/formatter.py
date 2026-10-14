@@ -19,14 +19,24 @@ from app.services.news_fetcher import NewsItem
 def escape_html(text: str) -> str:
     """Matn/URL'ni Telegram HTML parse_mode uchun xavfsiz qiladi.
 
-    Eslatma: Python'ning `html.escape(quote=True)` funksiyasi apostrofnı
+    Eslatma 1: Python'ning `html.escape(quote=True)` funksiyasi apostrofnı
     `&#x27;` ko'rinishida kodlaydi — bu Telegram'da yaroqsiz qoldiq entity
     sifatida ko'rinadi. Shu sababli `&#x27;` ni qayta `&apos;` ga
     almashtiramiz (Telegram HTML5 `<a>` ichida ham, tashqarisida ham
     `&apos;` ni to'g'ri qabul qiladi).
+
+    Eslatma 2: translator `_strip_leaked_entities()` yakuniy matndagi barcha
+    entity'larni sof belgilarga ochib, yolg'iz `&` larni allaqachon `&amp;`
+    qilgan bo'ladi. Shuning uchun `&amp;` ni qo'shlab escape qilmaymiz —
+    aks holda `&amp;amp;` (double-escape) paydo bo'ladi va foydalanuvchi
+    xabarda "Haaland &amp; Foden" deb o'qib chiqadi. Noma'lum `&...;`
+    ketma-ketliklari esa Telegram'da xato keltirib chiqarishi mumkin —
+    ularning `&` qismini himoya qilamiz.
     """
-    escaped = _html_escape(text or "", quote=True)
-    return escaped.replace("&#x27;", "&apos;")
+    # &amp; ni vaqtincha ajratib olamiz (u avvaldan to'g'ri escape qilingan)
+    protected = (text or "").replace("&amp;", "\x00AMP\x00")
+    escaped = _html_escape(protected, quote=True).replace("&#x27;", "&apos;")
+    return escaped.replace("\x00AMP\x00", "&amp;")
 
 HEADER_TEMPLATE = (
     "⚽ <b>BUGUNGI FUTBOL YANGILIKLARI</b>\n"

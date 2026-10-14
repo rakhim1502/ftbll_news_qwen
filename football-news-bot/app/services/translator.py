@@ -238,12 +238,28 @@ async def _strip_leaked_entities(text: str) -> str:
 
     prev = None
     out = text
-    # Bir necha qatlam bo'lsa ham — to qoldiq qolmaguncha ochamiz
+    # 1) Entity kodlarini (&#39;, &quot;, ...) sof belgilarga ochamiz.
+    #    `unescape` yolg'iz `&` ni o'zgartirmaydi — shuning uchun ochishni
+    #    avval bajarish kerak: aks holda `&amp;` ichidagi "amp" lug'atga
+    #    tushib buziladi va keyin ochilganda `&apos;alaba` kabi qoldiq qoladi.
+    #    Bir necha qatlam bo'lsa ham — to qoldiq qolmaguncha ochamiz.
     while prev != out and "&" in out:
         prev = out
         out = _html.unescape(out)
-    # Ochib bo'lmaydigan yaroqsiz kodlarni (&#x zarranglari) olib tashlaymiz
-    out = re.sub(r"&(?:#x[0-9A-Fa-f]*|#\d*|[A-Za-z0-9]*);?", "", out)
+    # 2) Ochilmaydigan yaroqsiz kodlarni (&#x zarranglari, yarim entitylar)
+    #    butunlay olib tashlaymiz. Yolg'iz `&` (semikolsiz, so'z orasidagi)
+    #    saqlab qolinadi — u 3-qatlamda &amp; ga aylanadi.
+    out = re.sub(r"&(?:#x[0-9A-Fa-f]+(?:;|$)|#\d+(?:;|$)|[A-Za-z0-9]+;)", "", out)
+    #    `&#x`/`&#` holdagi (rakam yoki semikol bo'lmagan) qoldiqlar ham
+    #    chiqmasligi kerak — ularni ham o'chiramiz.
+    out = re.sub(r"&#[xX]?(?![0-9A-Za-z])", "", out)
+    # 3) Endi matnda faqat YOLG'IZ (entity bo'lmagan) `&` qoldi — ularni
+    #    Telegram HTML uchun xavfsiz &amp; ga aylantiramiz. Bu bosqichda
+    #    almashtirish double-escape bermaydi, chunki barcha entitylar allaqachon
+    #    sof matnga aylangan. formatter.escape_html esa `&amp;` ni qo'shlab
+    #    escape qilmaydi (entity buzilmasligi uchun), shuning uchun &amp; bu
+    #    yerda yakuniy, to'g'ri ko'rinish hisoblanadi.
+    out = out.replace("&", "&amp;")
     return out
 
 
