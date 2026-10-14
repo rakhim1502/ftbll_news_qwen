@@ -1,4 +1,6 @@
-"""/start handler — MVP oqimi:
+"""Buyruqlar: /start (yangiliklar) va /help (yoriqnoma).
+
+/start oqimi:
 1) Foydalanuvchini kutib olish.
 2) "Yangiliklar izlanmoqda..." xabari.
 3) RSS'dan yig'ish -> saralash -> qisqartirish -> HTML xabar(lar).
@@ -9,10 +11,11 @@ from __future__ import annotations
 import logging
 
 from aiogram import Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
 from app.config import settings
+
 from app.services.news_fetcher import fetch_news
 from app.services.news_ranker import rank_news
 from app.services.translator import summarize_items
@@ -21,6 +24,20 @@ from app.utils.formatter import format_error, format_news_message, format_no_new
 logger = logging.getLogger(__name__)
 
 router = Router()
+
+HELP_TEXT = (
+    "ℹ️ <b>Qanday ishlaydi?</b>\n\n"
+    "📰 <b>/start</b> — bugungi eng muhim futbol yangiliklarini "
+    "o\u2018zbek tilida yuboradi (BBC Sport, Sky Sports, The Guardian).\n"
+    "ℹ️ <b>/help</b> — shu yoriqnomani ko\u2018rsatadi.\n\n"
+    "Har bir yangilik bilan asl maqola havolasi beriladi. "
+    "Yangiliklarni olish uchun <b>/start</b> yuboring!"
+)
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message) -> None:
+    await message.answer(HELP_TEXT, parse_mode="HTML")
 
 
 @router.message(CommandStart())

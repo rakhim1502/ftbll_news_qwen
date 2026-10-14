@@ -11,6 +11,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 
 from app.config import settings
 from app.handlers.start import router as start_router
@@ -35,6 +36,12 @@ async def main() -> None:
     )
     dp = Dispatcher()
     dp.include_router(start_router)
+
+    # Telegram menyu panelida /start va /help ko'rinadigan bo'ladi
+    await bot.set_my_commands([
+        BotCommand(command="start", description="📰 Bugungi futbol yangiliklari"),
+        BotCommand(command="help", description="ℹ️ Yoriqnoma"),
+    ])
 
     await bot.delete_webhook(drop_pending_updates=True)
     logger.info("Bot ishga tushdi. Long polling boshlandi...")

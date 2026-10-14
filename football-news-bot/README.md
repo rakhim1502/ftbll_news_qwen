@@ -11,7 +11,7 @@ maqola havolasini qo'shadi.
 |---|---|---|
 | 1 — MVP | ✅ Tayyor | `/start`, RSS yig'ish (parallel + timeout), dedupe+saralash, oddiy qisqartirish, HTML format, xatoga chidamli |
 | 2 — AI qisqartirish | ✅ Tayyor | `translator.py`da Gemini/Qwen chaqiruvi (fallback bilan); kalit bo'lmasa avtomatik AI'siz rejim |
-| 3 — Testlar | ✅ Tayyor | `tests/` — 35 ta pytest testi (fetcher, ranker, translator, formatter + `/start` pipeline smoke testlari) |
+| 3 — Testlar | ✅ Tayyor | `tests/` — 37 ta pytest testi (fetcher, ranker, translator, formatter + `/start`/`/help` smoke testlari) |
 | 4 — Qat'iy futbol filtri | ✅ Tayyor | RSS stream'lari aralash sport bo'lsa ham, faqat futbolga oid sarlavha/tegslar qoladi (`news_fetcher.is_football`) |
 | 5 — Entity-tozalash + demo | ✅ Tayyor | HTML entity qoldiqlari (`&#x27;`, `&amp;`) tugilish oldidan tozalanadi; `scripts/smoke_sources.py` real manbalarni tekshiradi |
 

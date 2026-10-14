@@ -134,3 +134,32 @@ async def test_start_error_resilience(monkeypatch):
     joined = "\n".join(msg.sent + msg.edited)
     assert "Xatolik" in joined or "xato" in joined.lower()
     # Handler exception ko'tarmadi — bu testgacha yetib keldik
+
+
+# ---------------------------------------------------------------------------
+# /help buyrug'i
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_help_handler_registered():
+    """Routerda /help uchun handler bo'lishi kerak."""
+    from app.handlers.start import router as start_router
+
+    handlers = [h.callback.__name__ for h in start_router.message.handlers]
+    assert "cmd_help" in handlers
+    assert "cmd_start" in handlers
+
+
+@pytest.mark.asyncio
+async def test_help_handler_answers_uzbek_text():
+    """/help javobi o'zbekcha va HTML formatda bo'lishi kerak."""
+    from app.handlers.start import cmd_help
+
+    msg = FakeMessage()
+    await cmd_help(msg)
+    assert len(msg.sent) == 1
+    text = msg.sent[0]
+    assert "/start" in text and "/help" in text
+    assert "<b>" in text  # HTML parse mode uchun teglar
+    # XSS-safe: foydalanuvchi kiritgan matn yo'q, entity qoldig'i bo'lmasligi kerak
+    assert "&#x" not in text
