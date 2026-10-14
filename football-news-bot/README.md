@@ -45,33 +45,62 @@ football-news-bot/
     utils/
       formatter.py       # Telegram HTML format + uzunlik chegarasi
   tests/
+  scripts/
+    setup.bat            # Windows: venv + o'rnatish + .env (bir marta)
+    run.bat              # Windows: botni ishga tushirish
+    test.bat             # Windows: testlarni ishga tushirish
+    demo_run.py          # Telegram'siz butun zanjirni sinash
+    smoke_sources.py     # RSS manbalar jonli tekshiruvi
   .env.example
-  requirements.txt
+  requirements.txt       # dev chegaralar (>=)
+  requirements.lock.txt  # aniq versiyalar (==) — tavsiya etiladi
   README.md
 ```
 
 ## Windows + VS Code da ishga tushirish
 
-1. **Python 3.11+** o'rnatilgan bo'lsin (`python --version`).
+### Tez usul (skriptlar bilan — tavsiya etiladi)
+
+1. **Python 3.11+** o'rnatilgan bo'lsin (`python --version`). O'rnatishda
+   **"Add Python to PATH"** belgisini albatta tanlang.
 2. VS Code'da bu papkani oching: `File → Open Folder → football-news-bot`.
-3. Terminalni oching (Ctrl+`) va virtual muhit yarating:
+3. Terminalni oching (Ctrl+`) va bitta buyruq bilan hammasini qiling:
    ```powershell
-   python -m venv .venv
-   .venv\Scripts\activate
-   pip install -r requirements.txt
+   scripts\setup.bat
    ```
-4. `.env` faylini yarating:
-   ```powershell
-   copy .env.example .env
-   ```
-   `.env` ichida `BOT_TOKEN=` ga @BotFather'dan olingan tokenni yozing.
+   Skript: `.venv` yaratadi, `requirements.lock.txt`dagi aniq versiyalarni
+   o'rnatadi va `.env.example`dan `.env` nusxa oladi.
+4. `.env` faylini oching va `BOT_TOKEN=` ga @BotFather'dan olingan tokenni yozing.
 5. Botni ishga tushiring:
    ```powershell
-   python -m app.main
+   scripts\run.bat
    ```
 6. Telegram'da botingizni ochib `/start` yuboring.
 
+Qo'shimcha skriptlar:
+- `scripts\test.bat` — barcha pytest testlarini ishga tushiradi;
+- `scripts\demo_run.py` — Telegram'siz butun zanjirni sinaydi
+  (`".venv\Scripts\python.exe" scripts\demo_run.py`).
+
 To'xtatish: terminalda `Ctrl+C`.
+
+### Qo'lda usul (skriptsiz)
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.lock.txt   # aniq versiyalar (tavsiya)
+# yoki: pip install -r requirements.txt  (dev chegaralar)
+copy .env.example .env                  # so'ng BOT_TOKEN ni kiriting
+python -m app.main
+```
+
+## requirements.txt vs requirements.lock.txt
+
+| Fayl | Maqsad |
+|---|---|
+| `requirements.txt` | Ishlab chiqish uchun minimal versiya chegaralari (`>=`) |
+| `requirements.lock.txt` | Aniq pinlangan versiyalar (`==`) — takrorlanadigan, xatosiz o'rnatish uchun |
 
 ## AI qisqartirishni yoqish (ixtiyoriy)
 
